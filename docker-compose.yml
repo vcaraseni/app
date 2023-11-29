@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+    redis:
+        image: redis:alpine
+        container_name: app_redis
+        networks:
+            - app_network
+
+#    postgres:
+#        image: postgres:14.7
+#        container_name: app_postgres
+#        networks:
+#            - app_network
+#        ports:
+#            - "5434:5432"
+#        environment:
+#            - POSTGRES_USER=app-user
+#            - POSTGRES_PASSWORD=app-password
+#            - POSTGRES_DB=app-db
+#        volumes:
+#            - .:/var/lib/app-postgresql/data
+
+    postgres:
+        image: 'postgres:15'
+        container_name: app_postgres
+        ports:
+            - "5434:5432"
+        environment:
+            PGPASSWORD: '${DB_PASSWORD}'
+            POSTGRES_DB: '${DB_DATABASE}'
+            POSTGRES_USER: '${DB_USERNAME}'
+            POSTGRES_PASSWORD: '${DB_PASSWORD}'
+        volumes:
+            - .:/var/lib/postgresql/app/data
+        networks:
+            - app_network
+        healthcheck:
+            test: [ "CMD", "pg_isready", "-q", "-d", "${DB_DATABASE}", "-U", "${DB_USERNAME}" ]
+            retries: 3
+            timeout: 5s
+
+
+    nginx:
+        image: nginx:alpine
+        container_name: app_nginx
+        working_dir: /app
+        networks:
+            - app_network
+        volumes:
+            - .:/app
+            - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/nginx.conf
+        ports:
+            - "81:80"
+
+    php-fpm:
+        build: ./docker/php-fpm
+        container_name: app_php-fpm
+        working_dir: /app
+        networks:
+            - app_network
+        volumes:
+            - .:/app
+            - ./docker/php-fpm/php-ini-overrides.ini:/etc/php-fpm/7.3/fpm/conf.d/99-overrides.ini
+
+networks:
+    app_network:
+        driver: bridge
